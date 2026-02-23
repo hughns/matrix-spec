@@ -1720,14 +1720,25 @@ authentication type.
 
 1. [Discover the OAuth 2.0 server metadata](#server-metadata-discovery).
 2. [Register the client with the homeserver](#client-registration).
-3. [Obtain an access token](#login-flow) by authorizing a [scope](#scope) for the client with the [authorization code grant](#authorization-code-grant).
+3. Obtain an access token by authorizing a [scope](#scope) for the client with
+   one of the supported grant types:
+   - Use the [authorization code grant](#authorization-code-grant) via the
+     [login flow](#login-flow) for clients with access to a web browser.
+   - {{% added-in v="1.18" %}} Use the [device authorization grant](#device-authorization-grant) via the
+     [device authorization flow](#device-authorization-flow) for clients on
+     devices with limited input capabilities (e.g. CLI applications or TVs)
+     where the user completes authorization on a separate device.
 4. [Refresh the access token](#token-refresh-flow) with the [refresh token grant](#refresh-token-grant) when it expires.
 5. [Revoke the tokens](#token-revocation) when the users wants to log out of the client.
 
 #### Login flow
 
 Logging in with the OAuth 2.0 API should be done with the [authorization code
-grant](#authorization-code-grant). In the context of the Matrix specification,
+grant](#authorization-code-grant) for clients that have access to a web browser.
+For clients on devices with limited input capabilities, the
+[device authorization flow](#device-authorization-flow) can be used instead.
+
+In the context of the Matrix specification,
 this means requesting a [scope](#scope) including full client-server API
 read/write access and allocating a device ID.
 
@@ -1872,6 +1883,141 @@ Sample response:
 
 Finally, the client can call the  [`/whoami`](#get_matrixclientv3accountwhoami)
 endpoint to get the user ID that owns the access token.
+
+#### Device authorization flow
+
+{{% added-in v="1.18" %}}
+
+The device authorization flow allows clients on devices with limited input
+capabilities (such as CLI applications or TVs) to obtain an
+access token by having the user complete authorization on a separate device
+with a web browser. This flow uses the [device authorization
+grant](#device-authorization-grant).
+
+In the context of the Matrix specification, this means requesting a
+[scope](#scope) including full client-server API read/write access and
+allocating a device ID, as with the [login flow](#login-flow).
+
+Once the client has retrieved the [server metadata](#server-metadata-discovery),
+it needs to generate the following value:
+
+- `device_id`: a unique identifier for this device; see the
+  [`urn:matrix:client:device:<device_id>`](#device-id-allocation) scope token.
+
+**Device authorization request**
+
+The client sends a `application/x-www-form-urlencoded` encoded `POST` request to
+the `device_authorization_endpoint` as defined in
+[RFC 8628 section 3.1](https://datatracker.ietf.org/doc/html/rfc8628#section-3.1):
+
+| Parameter   | Value                                                          |
+|-------------|----------------------------------------------------------------|
+| `client_id` | The client ID returned from client registration.               |
+| `scope`     | `urn:matrix:client:api:* urn:matrix:client:device:<device_id>` with the `device_id` generated previously. |
+
+Sample device authorization request:
+
+```http
+POST /oauth2/device HTTP/1.1
+Host: account.example.com
+Content-Type: application/x-www-form-urlencoded
+
+client_id=s6BhdRkqt3&scope=urn%3Amatrix%3Aclient%3Aapi%3A%2A%20urn%3Amatrix%3Aclient%3Adevice%3AAABBBCCCDDD
+```
+
+**Device authorization response**
+
+The server responds with a JSON object as defined in
+[RFC 8628 section 3.2](https://datatracker.ietf.org/doc/html/rfc8628#section-3.2),
+containing:
+
+| Parameter                    |                                                                                                                                               |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| `device_code`                | The device verification code.                                                                                                                 |
+| `user_code`                  | An end-user verification code.                                                                                                                |
+| `verification_uri`           | The end-user verification URI on the authorization server.                                                                                    |
+| `verification_uri_complete`  | Optionally, the URI including the `user_code`, so the user does not need to type it in manually.                                              |
+| `expires_in`                 | The lifetime in seconds of the `device_code` and `user_code`.                                                                                 |
+| `interval`                   | The minimum number of seconds the client should wait between polling requests to the token endpoint. If omitted, clients should default to 5. |
+
+It is RECOMMENDED that the server provides a `verification_uri_complete` such
+that the user does not need to type in the `user_code`.
+
+Sample response:
+
+```json
+{
+  "device_code": "GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS",
+  "user_code": "WDJB-MJHT",
+  "verification_uri": "https://account.example.com/link",
+  "verification_uri_complete": "https://account.example.com/link?user_code=WDJB-MJHT",
+  "expires_in": 1800,
+  "interval": 5
+}
+```
+
+**User interaction**
+
+The client conveys the `verification_uri_complete` (and/or `verification_uri`
+and `user_code`) to the user. How the client does this depends on the
+specific device characteristics and use case. For example:
+
+- A CLI application could display the `verification_uri` and `user_code` as text
+  for the user to type into their browser on another device.
+- A TV application could encode the `verification_uri_complete` (with fallback
+  to `verification_uri`) as a QR code for the user to scan with their phone.
+
+The user opens the verification URI in a web browser on another device and
+completes authentication and authorization.
+
+**Token polling**
+
+While the user is completing authorization, the client polls the
+`token_endpoint` for the outcome, at intervals no shorter than the `interval`
+value from the device authorization response.
+
+The poll request is a `POST` to the `token_endpoint` with the following
+parameters, encoded as `application/x-www-form-urlencoded` in the body:
+
+| Parameter     | Value                                                          |
+|---------------|----------------------------------------------------------------|
+| `grant_type`  | `urn:ietf:params:oauth:grant-type:device_code`                 |
+| `device_code` | The `device_code` from the device authorization response.      |
+| `client_id`   | The client ID returned from client registration.               |
+
+Sample token polling request:
+
+```http
+POST /oauth2/token HTTP/1.1
+Host: account.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&device_code=GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS&client_id=s6BhdRkqt3
+```
+
+The server responds as defined in [RFC 8628 section
+3.5](https://datatracker.ietf.org/doc/html/rfc8628#section-3.5):
+
+- While authorization is pending, the server returns an `authorization_pending`
+  error (or `slow_down` if the client is polling too frequently).
+- If authorization is denied, the server returns an `access_denied` error.
+- If the device code expires, the server returns an `expired_token` error.
+- On successful authorization, the server returns a JSON object containing the
+  access token, token type, expiration time, refresh token, and scope:
+
+```json
+{
+  "access_token": "2YotnFZFEjr1zCsicMWpAA",
+  "token_type": "Bearer",
+  "expires_in": 299,
+  "refresh_token": "tGz3JOkF0XG5Qx2TlKWIA",
+  "scope": "urn:matrix:client:api:* urn:matrix:client:device:AAABBBCCCDDD"
+}
+```
+
+Finally, the client can call the [`/whoami`](#get_matrixclientv3accountwhoami)
+endpoint to get the user ID that owns the access token. Token refreshing and
+revocation proceed as with the [login flow](#login-flow).
 
 #### Token refresh flow
 
@@ -2203,6 +2349,7 @@ The client must also have obtained a `client_id` by [registering with the server
 
 This specification supports the following grant types:
 - [Authorization code grant](#authorization-code-grant)
+- {{% added-in v="1.18" %}} [Device authorization grant](#device-authorization-grant)
 - [Refresh token grant](#refresh-token-grant)
 
 ##### Authorization code grant
@@ -2239,6 +2386,35 @@ Whether the homeserver supports this parameter is advertised by the
 
 Servers that support this parameter SHOULD show the account registration UI in
 the browser.
+
+##### Device authorization grant
+
+{{% added-in v="1.18" %}}
+
+As per [RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628), the device
+authorization grant lets clients on devices with limited input capabilities
+obtain an access token by having the user complete authorization on a separate
+device with a web browser.
+
+This grant requires the client to know the following [authorization server
+metadata](#server-metadata-discovery):
+
+- `device_authorization_endpoint`
+
+To use this grant, homeservers and clients MUST:
+
+- Support the device authorization grant as per
+  [RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628).
+- Support the [refresh token grant](#refresh-token-grant).
+
+As with the [authorization code grant](#authorization-code-grant), when
+authorization is granted to a client, the homeserver MUST issue a refresh token
+to the client in addition to the access token. The access token and refresh
+token have the same lifetime constraints as described in the [refresh token
+grant](#refresh-token-grant) section.
+
+The full flow for using this grant is described in the
+[device authorization flow](#device-authorization-flow).
 
 ##### Refresh token grant
 
