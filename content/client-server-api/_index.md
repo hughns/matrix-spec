@@ -1726,7 +1726,7 @@ authentication type.
      [login flow](#login-flow) for clients with access to a web browser.
    - {{% added-in v="1.18" %}} Use the [device authorization grant](#device-authorization-grant) via the
      [device authorization flow](#device-authorization-flow) for clients on
-     devices with limited input capabilities (e.g. CLI applications or TVs)
+     devices with limited input capabilities (e.g. CLI applications or embedded devices)
      where the user completes authorization on a separate device.
 4. [Refresh the access token](#token-refresh-flow) with the [refresh token grant](#refresh-token-grant) when it expires.
 5. [Revoke the tokens](#token-revocation) when the users wants to log out of the client.
@@ -1889,7 +1889,7 @@ endpoint to get the user ID that owns the access token.
 {{% added-in v="1.18" %}}
 
 The device authorization flow allows clients on devices with limited input
-capabilities (such as CLI applications or TVs) to obtain an
+capabilities (such as CLI applications or embedded devices) to obtain an
 access token by having the user complete authorization on a separate device
 with a web browser. This flow uses the [device authorization
 grant](#device-authorization-grant).
@@ -1964,8 +1964,9 @@ specific device characteristics and use case. For example:
 
 - A CLI application could display the `verification_uri` and `user_code` as text
   for the user to type into their browser on another device.
-- A TV application could encode the `verification_uri_complete` (with fallback
-  to `verification_uri`) as a QR code for the user to scan with their phone.
+- An embedded device with a screen could encode the `verification_uri_complete`
+  (with fallback to `verification_uri`) as a QR code for the user to scan with
+  their phone.
 
 The user opens the verification URI in a web browser on another device and
 completes authentication and authorization.
