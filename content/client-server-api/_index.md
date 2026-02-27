@@ -1888,11 +1888,14 @@ endpoint to get the user ID that owns the access token.
 
 {{% added-in v="1.18" %}}
 
-The device authorization flow allows clients on devices with limited input
-capabilities (such as CLI applications or embedded devices) to obtain an
-access token by having the user complete authorization on a separate device
-with a web browser. This flow uses the [device authorization
-grant](#device-authorization-grant).
+The device authorization flow allows clients to obtain an access token without
+needing to directly interact with a web browser. Instead, the user completes
+authorization on a web browser that can be on a separate device. This is useful
+for devices with limited input capabilities (such as CLI applications or
+embedded devices) or where the redirect handling may be unreliable (such as a
+desktop applications).
+
+This flow uses the [device authorization grant](#device-authorization-grant).
 
 In the context of the Matrix specification, this means requesting a
 [scope](#scope) including full client-server API read/write access and
@@ -1967,9 +1970,12 @@ specific device characteristics and use case. For example:
 - An embedded device with a screen could encode the `verification_uri_complete`
   (with fallback to `verification_uri`) as a QR code for the user to scan with
   their phone.
+- A desktop application running on a platform that does not support callbacks
+  could launch the `verification_uri_complete` (with fallback to
+  `verification_uri`) in the system browser.
 
-The user opens the verification URI in a web browser on another device and
-completes authentication and authorization.
+The user opens the verification URI in a web browser, which may be on another
+device, and completes authentication and authorization.
 
 **Token polling**
 
