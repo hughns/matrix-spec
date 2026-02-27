@@ -1939,7 +1939,7 @@ containing:
 | `device_code`                | The device verification code.                                                                                                                 |
 | `user_code`                  | An end-user verification code.                                                                                                                |
 | `verification_uri`           | The end-user verification URI on the authorization server.                                                                                    |
-| `verification_uri_complete`  | Optionally, the URI including the `user_code`, so the user does not need to type it in manually.                                              |
+| `verification_uri_complete`  | Optionally, the URI which doesn't require the user to manually type the `user_code`, designed for non-textual transmission.                   |
 | `expires_in`                 | The lifetime in seconds of the `device_code` and `user_code`.                                                                                 |
 | `interval`                   | The minimum number of seconds the client should wait between polling requests to the token endpoint. If omitted, clients should default to 5. |
 
